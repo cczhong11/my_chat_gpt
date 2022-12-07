@@ -12,9 +12,9 @@ from telegram.ext import (
     Filters,
     CallbackContext,
 )
-        
+config = json.load(open("config.json"))
 # Initializing the chat class will automatically log you in, check access_tokens
-chat = Chat(email="", password="") 
+chat = Chat(email=config.get("email"), password=config.get("password"))
 
 
 
@@ -51,7 +51,7 @@ def reply(update: Update, context: CallbackContext) -> None:
 def main() -> None:
     """Start the bot."""
    
-    updater = Updater()
+    updater = Updater(config.get("token"))
 
     # Get the dispatcher to register handlers
     dispatcher = updater.dispatcher
