@@ -1,81 +1,66 @@
-from pychatgpt import Chat
-
 import json
 
 
-import traceback
+import logging
 from telegram import Update
 from telegram.ext import (
-    Updater,
-    CommandHandler,
+    filters,
     MessageHandler,
-    Filters,
-    CallbackContext,
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
 )
+
+from Assistant.assistant import Assistant
+
+
 config = json.load(open("config.json"))
-# Initializing the chat class will automatically log you in, check access_tokens
-chat = Chat(email=config.get("email"), password=config.get("password"))
-
-
+my_assistant = Assistant("aws", config)
 
 
 def is_allowed(update: Update) -> bool:
     """Check if the user is sane."""
-    if update.effective_user.username not in ['cczhong']:
+    if update.effective_user.username not in ["cczhong", "tanyz33"]:
         update.message.reply_text(
-            "You are not allowed to use this bot. Contact @Klingefjord to get access."
+            "You are not allowed to use this bot. Contact @cczhong to get access."
         )
         return False
     return True
 
 
-def reply(update: Update, context: CallbackContext) -> None:
-    """Call the OpenAI API."""
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
 
+
+async def reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update):
         return
     try:
-
         user_input = update.message.text
-        answer = chat.ask(user_input)
-        if answer is None:
-            update.message.reply_text("Please try later")
+        reply_msg = my_assistant.reply(user_input)
+        if reply_msg is None:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id, text="Please try later"
+            )
         else:
-            
-            update.message.reply_text(answer)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id, text=reply_msg
+            )
     except KeyboardInterrupt:
         print(f">> Exiting...")
 
 
-
-def main() -> None:
-    """Start the bot."""
-   
-    updater = Updater(config.get("token"))
-
-    # Get the dispatcher to register handlers
-    dispatcher = updater.dispatcher
-
-    # on different commands - answer in Telegram
-
-
-    # on non command i.e message - echo the message on Telegram
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, reply))
-
-    # Start the Bot
-    updater.start_polling()
-
-    # Run the bot until you press Ctrl-C or the process receives SIGINT,
-    # SIGTERM or SIGABRT. This should be used most of the time, since
-    # start_polling() is non-blocking and will stop the bot gracefully.
-    updater.idle()
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id, text="I'm a tc bot"
+    )
 
 
 if __name__ == "__main__":
-    main()
-
-
-
-
-
-
+    application = ApplicationBuilder().token(config.get("token")).build()
+    reply_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), reply)
+    start_handler = CommandHandler("start", start)
+    application.add_handler(start_handler)
+    application.add_handler(reply_handler)
+    application.run_polling()
